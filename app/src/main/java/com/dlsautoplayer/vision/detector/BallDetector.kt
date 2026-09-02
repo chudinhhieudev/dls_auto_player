@@ -10,55 +10,85 @@ import org.opencv.imgproc.Imgproc
 class BallDetector {
 
     /**
-     * Thuật toán: Chuyển ảnh sang hệ màu HSV, lọc dải màu của quả bóng (ví dụ màu trắng/vàng sáng).
-     * Sau đó tìm contour hình tròn lớn nhất / có diện tích phù hợp.
+     * Thuật toán: Nhận diện quả bóng với đa dạng dải màu trong DLS:
+     * - Bóng Cam / Vàng
+     * - Bóng Hồng / Đỏ (Pink / Salmon)
+     * - Bóng Trắng sáng
      */
     fun detect(mat: Mat): DetectionResult? {
         val hsvMat = Mat()
         Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_RGBA2RGB)
         Imgproc.cvtColor(hsvMat, hsvMat, Imgproc.COLOR_RGB2HSV)
 
-        // Cấu hình dải màu Cam (Orange) cho quả bóng
-        // Trong OpenCV, Hue màu cam thường nằm ở khoảng 10 đến 25
-        val lowerOrange = Scalar(5.0, 100.0, 100.0)
-        val upperOrange = Scalar(25.0, 255.0, 255.0)
+        // 1. Dải màu Cam / Vàng (Orange / Yellow)
+        val orangeMask = Mat()
+        Core.inRange(hsvMat, Scalar(10.0, 50.0, 100.0), Scalar(35.0, 255.0, 255.0), orangeMask)
 
-        val mask = Mat()
-        Core.inRange(hsvMat, lowerOrange, upperOrange, mask)
+        // 2. Dải màu Hồng / Đỏ (Pink / Red ball)
+        val pinkMask1 = Mat()
+        val pinkMask2 = Mat()
+        val pinkMask = Mat()
+        Core.inRange(hsvMat, Scalar(0.0, 35.0, 120.0), Scalar(10.0, 255.0, 255.0), pinkMask1)
+        Core.inRange(hsvMat, Scalar(160.0, 35.0, 120.0), Scalar(180.0, 255.0, 255.0), pinkMask2)
+        Core.bitwise_or(pinkMask1, pinkMask2, pinkMask)
+
+        // 3. Dải màu Trắng sáng (White ball)
+        val whiteMask = Mat()
+        Core.inRange(hsvMat, Scalar(0.0, 0.0, 215.0), Scalar(180.0, 40.0, 255.0), whiteMask)
+
+        // Gộp tất cả các mask
+        val combinedMask = Mat()
+        Core.bitwise_or(orangeMask, pinkMask, combinedMask)
+        Core.bitwise_or(combinedMask, whiteMask, combinedMask)
 
         val contours = mutableListOf<MatOfPoint>()
         val hierarchy = Mat()
-        Imgproc.findContours(mask, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+        Imgproc.findContours(combinedMask, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
         var bestMatch: DetectionResult? = null
         var maxArea = 0.0
 
         for (contour in contours) {
             val area = Imgproc.contourArea(contour)
-            // Lọc các đốm nhiễu (diện tích quá nhỏ) hoặc quá to
-            if (area > 50 && area < 2000) {
+            // Quả bóng thực tế rất nhỏ trên sân (10 đến 300 pixel)
+            if (area > 10 && area < 350) {
                 val boundingRect = Imgproc.boundingRect(contour)
+                val centerY = boundingRect.y + boundingRect.height / 2.0f
+                val centerX = boundingRect.x + boundingRect.width / 2.0f
+                
+                val normY = centerY / mat.height()
+                val normX = centerX / mat.width()
+
+                // Bỏ qua vùng UI trên cùng (Scoreboard, Pause) và dưới cùng (Radar)
+                if (normY < 0.25f || normY > 0.88f) continue
+                if (normX < 0.05f || normX > 0.95f) continue
+
+                // Quả bóng phải có tỷ lệ xấp xỉ hình tròn (width / height gần 1.0)
+                val aspectRatio = boundingRect.width.toFloat() / boundingRect.height.toFloat()
+                if (aspectRatio < 0.6f || aspectRatio > 1.6f) continue
                 
                 if (area > maxArea) {
                     maxArea = area
                     
-                    val centerX = boundingRect.x + boundingRect.width / 2.0f
-                    val centerY = boundingRect.y + boundingRect.height / 2.0f
-                    
                     bestMatch = DetectionResult(
                         label = "Ball",
-                        x = centerX.toFloat() / mat.width(),
-                        y = centerY.toFloat() / mat.height(),
+                        x = normX,
+                        y = normY,
                         width = boundingRect.width.toFloat() / mat.width(),
                         height = boundingRect.height.toFloat() / mat.height(),
-                        confidence = 0.8f // Giả định confidence
+                        confidence = 0.85f
                     )
                 }
             }
         }
 
         hsvMat.release()
-        mask.release()
+        orangeMask.release()
+        pinkMask1.release()
+        pinkMask2.release()
+        pinkMask.release()
+        whiteMask.release()
+        combinedMask.release()
         hierarchy.release()
         return bestMatch
     }

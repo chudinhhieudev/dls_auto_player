@@ -8,6 +8,10 @@ import com.dlsautoplayer.vision.detector.PlayerDetector
 import com.dlsautoplayer.vision.detector.ScoreboardDetector
 import com.dlsautoplayer.vision.detector.TeammateDetector
 import com.dlsautoplayer.vision.detector.GoalkeeperDetector
+import com.dlsautoplayer.vision.detector.OpponentDetector
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.Mat
@@ -25,6 +29,7 @@ class VisionEngine {
     private val scoreboardDetector = ScoreboardDetector()
     private val teammateDetector = TeammateDetector()
     private val goalkeeperDetector = GoalkeeperDetector()
+    private val opponentDetector = OpponentDetector()
 
     init {
         if (!OpenCVLoader.initDebug()) {
@@ -38,31 +43,41 @@ class VisionEngine {
     /**
      * Xử lý frame ảnh, trả về danh sách các đối tượng nhận diện được.
      */
-    fun processFrame(image: Image): List<DetectionResult> {
-        if (!isInitialized) return emptyList()
+    suspend fun processFrame(image: Image): List<DetectionResult> = coroutineScope {
+        if (!isInitialized) return@coroutineScope emptyList()
+
+        val mat = imageToMat(image)
+        if (mat == null) return@coroutineScope emptyList()
 
         val results = mutableListOf<DetectionResult>()
-        val mat = imageToMat(image)
-        if (mat == null) return results
 
-        // Chạy các detector
-        val ball = ballDetector.detect(mat)
+        val deferredBall = async(Dispatchers.Default) { ballDetector.detect(mat) }
+        val deferredPlayer = async(Dispatchers.Default) { playerDetector.detect(mat) }
+        val deferredScoreboard = async(Dispatchers.Default) { scoreboardDetector.detect(mat) }
+        val deferredTeammates = async(Dispatchers.Default) { teammateDetector.detect(mat) }
+        val deferredGoalkeeper = async(Dispatchers.Default) { goalkeeperDetector.detect(mat) }
+        val deferredOpponents = async(Dispatchers.Default) { opponentDetector.detect(mat) }
+
+        val ball = deferredBall.await()
         if (ball != null) results.add(ball)
 
-        val player = playerDetector.detect(mat)
+        val player = deferredPlayer.await()
         if (player != null) results.add(player)
 
-        val scoreboard = scoreboardDetector.detect(mat)
+        val scoreboard = deferredScoreboard.await()
         if (scoreboard != null) results.add(scoreboard)
 
-        val teammates = teammateDetector.detect(mat)
+        val teammates = deferredTeammates.await()
         results.addAll(teammates)
 
-        val goalkeeper = goalkeeperDetector.detect(mat)
+        val goalkeeper = deferredGoalkeeper.await()
         if (goalkeeper != null) results.add(goalkeeper)
 
+        val opponents = deferredOpponents.await()
+        results.addAll(opponents)
+
         mat.release() // Giải phóng bộ nhớ
-        return results
+        return@coroutineScope results
     }
 
     private fun imageToMat(image: Image): Mat? {

@@ -59,9 +59,55 @@ class AccessibilityInputController(
     }
 
     override fun shoot() {
-        // Nút A (Sút) thường nằm ở góc dưới bên phải. Bạn có thể cần tinh chỉnh toạ độ này.
+        // Nút A (Sút/Xoạc)
         val shootX = 0.85f
         val shootY = 0.85f
         tap(shootX, shootY)
+    }
+
+    override fun pressB() {
+        // Nút B (Tăng toạ độ X lên 0.80f theo feedback)
+        val bX = 0.85f
+        val bY = 0.855f
+        tap(bX, bY)
+    }
+
+    override fun pressC() {
+        // Nút C (Chuyền bổng/Đổi người)
+        val cX = 0.85f
+        val cY = 0.60f
+        tap(cX, cY)
+    }
+
+    override fun moveAndAction(
+        startX: Float, startY: Float, endX: Float, endY: Float,
+        actionType: String?
+    ) {
+        val displayMetrics = accessibilityService.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
+        val builder = GestureDescription.Builder()
+
+        // 1. Vuốt Joystick (Giữ 400ms để cầu thủ chạy liên tục)
+        val swipePath = Path().apply {
+            moveTo(startX * screenWidth, startY * screenHeight)
+            lineTo(endX * screenWidth, endY * screenHeight)
+        }
+        builder.addStroke(GestureDescription.StrokeDescription(swipePath, 0, 400))
+
+        // 2. Bấm nút đồng thời
+        if (actionType != null) {
+            val tapPath = Path()
+            when (actionType) {
+                "A" -> tapPath.moveTo(0.85f * screenWidth, 0.85f * screenHeight)
+                "B" -> tapPath.moveTo(0.85f * screenWidth, 0.855f * screenHeight) // Theo toạ độ bạn sửa
+                "C" -> tapPath.moveTo(0.85f * screenWidth, 0.60f * screenHeight)
+            }
+            // Delay 50ms để game nhận Joystick trước, giữ 50ms
+            builder.addStroke(GestureDescription.StrokeDescription(tapPath, 50, 50))
+        }
+
+        accessibilityService.dispatchGesture(builder.build(), null, null)
     }
 }

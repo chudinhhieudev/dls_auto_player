@@ -12,6 +12,7 @@ data class GameState(
     var scoreboardPosition: DetectionResult? = null,
     var teammates: List<DetectionResult> = emptyList(),
     var goalkeeper: DetectionResult? = null,
+    var opponents: List<DetectionResult> = emptyList(),
     var lastUpdateTime: Long = 0
 ) {
     /**
@@ -22,13 +23,15 @@ data class GameState(
         player: DetectionResult?, 
         scoreboard: DetectionResult?,
         teammates: List<DetectionResult>,
-        goalkeeper: DetectionResult?
+        goalkeeper: DetectionResult?,
+        opponents: List<DetectionResult>
     ) {
         if (ball != null) this.ballPosition = ball
         if (player != null) this.playerPosition = player
         this.scoreboardPosition = scoreboard // Cho phép null để reset
         this.teammates = teammates
         this.goalkeeper = goalkeeper
+        this.opponents = opponents
         this.lastUpdateTime = System.currentTimeMillis()
     }
 
@@ -39,9 +42,11 @@ data class GameState(
     fun hasPossession(): Boolean {
         val p = playerPosition ?: return false
         val b = ballPosition ?: return false
+        // Mũi tên (playerPosition) nằm trên đầu, bóng nằm ở chân (thấp hơn khoảng 10-12% màn hình)
+        val footY = p.y + 0.12f
         val dx = p.x - b.x
-        val dy = p.y - b.y
+        val dy = footY - b.y
         val dist = Math.sqrt((dx * dx + dy * dy).toDouble())
-        return dist < 0.05 // Tuỳ chỉnh threshold
+        return dist < 0.15 // Nới lỏng ngưỡng (15%) vì khi dốc bóng, bóng bị đẩy ra xa chân
     }
 }

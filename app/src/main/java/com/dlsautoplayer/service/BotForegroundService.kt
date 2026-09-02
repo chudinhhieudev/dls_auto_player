@@ -56,7 +56,7 @@ class BotForegroundService : Service() {
                 } else {
                     Log.d(TAG, "Bot Paused")
                     // Reset trạng thái
-                    gameState.update(null, null, null, emptyList(), null)
+                    gameState.update(null, null, null, emptyList(), null, emptyList())
                 }
             }
             floatingUIManager?.show()
@@ -108,6 +108,7 @@ class BotForegroundService : Service() {
                         var scoreboard: DetectionResult? = null
                         val teammates = mutableListOf<DetectionResult>()
                         var goalkeeper: DetectionResult? = null
+                        val opponents = mutableListOf<DetectionResult>()
                         
                         for (det in detections) {
                             if (det.label == "Ball") ball = det
@@ -115,10 +116,11 @@ class BotForegroundService : Service() {
                             if (det.label == "Scoreboard") scoreboard = det
                             if (det.label == "Teammate") teammates.add(det)
                             if (det.label == "Goalkeeper") goalkeeper = det
+                            if (det.label == "Opponent") opponents.add(det)
                         }
                         
                         // Cập nhật Game State
-                        gameState.update(ball, player, scoreboard, teammates, goalkeeper)
+                        gameState.update(ball, player, scoreboard, teammates, goalkeeper, opponents)
                         
                         // Kích hoạt Decision Engine
                         decisionEngine.decideAndExecute(gameState, BotAccessibilityService.inputController)

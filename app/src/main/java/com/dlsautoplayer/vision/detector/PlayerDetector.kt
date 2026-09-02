@@ -35,23 +35,25 @@ class PlayerDetector {
 
         for (contour in contours) {
             val area = Imgproc.contourArea(contour)
-            // Lọc theo diện tích của mũi tên
-            if (area > 30 && area < 1500) {
+            // Lọc theo diện tích của mũi tên chỉ định cầu thủ (20 đến 800 pixel)
+            if (area > 20 && area < 800) {
                 val boundingRect = Imgproc.boundingRect(contour)
+                val centerY = boundingRect.y + boundingRect.height / 2.0f
+                val centerX = boundingRect.x + boundingRect.width / 2.0f
+
+                val normY = centerY / mat.height()
+                val normX = centerX / mat.width()
+
+                // Bỏ qua thanh UI trên cùng
+                if (normY < 0.20f) continue
                 
                 if (area > maxArea) {
                     maxArea = area
                     
-                    val centerX = boundingRect.x + boundingRect.width / 2.0f
-                    val centerY = boundingRect.y + boundingRect.height / 2.0f
-                    
-                    // Toạ độ thực của cầu thủ nằm ngay bên dưới mũi tên một chút
-                    val playerY = centerY + 50 // Tuỳ chỉnh sau theo game thực tế
-                    
                     bestMatch = DetectionResult(
                         label = "ControlledPlayer",
-                        x = centerX.toFloat() / mat.width(),
-                        y = playerY.toFloat() / mat.height(),
+                        x = normX,
+                        y = normY,
                         width = boundingRect.width.toFloat() / mat.width(),
                         height = boundingRect.height.toFloat() / mat.height(),
                         confidence = 0.8f

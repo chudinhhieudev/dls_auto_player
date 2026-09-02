@@ -3,68 +3,58 @@ package com.dlsautoplayer.presentation
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
-import android.widget.LinearLayout
+import android.widget.TextView
 
 class FloatingUIManager(private val context: Context, private val onToggleListener: (Boolean) -> Unit) {
 
     private var windowManager: WindowManager? = null
     private var floatingView: View? = null
     private var isBotActive = false
-    private var button: Button? = null
+    private var iconView: TextView? = null
 
     fun show() {
         if (floatingView != null) return
 
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-        // Khởi tạo Layout
-        val layout = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.TRANSPARENT)
-        }
+        val sizePx = dpToPx(48)
 
-        // Tạo nút Play/Pause
-        button = Button(context).apply {
-            text = "▶ PLAY"
-            setBackgroundColor(Color.parseColor("#4CAF50")) // Màu xanh
+        val textView = TextView(context).apply {
+            textSize = 22f
+            gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
-            setOnClickListener {
-                isBotActive = !isBotActive
-                updateButtonState()
-                onToggleListener(isBotActive)
-            }
         }
+        iconView = textView
+        updateIcon()
 
-        layout.addView(button)
-
-        // Cấu hình Layout Params cho WindowManager
         val layoutParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            sizePx,
+            sizePx,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
                 WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
-        )
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 30
+            y = 180
+        }
 
-        layoutParams.gravity = Gravity.TOP or Gravity.START
-        layoutParams.x = 0
-        layoutParams.y = 100
-
-        // Lắng nghe sự kiện vuốt để kéo thả nút trên màn hình
-        layout.setOnTouchListener(object : View.OnTouchListener {
+        iconView?.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
             private var initialTouchX = 0f
             private var initialTouchY = 0f
+            private var isClick = false
 
             override fun onTouch(v: View, event: MotionEvent): Boolean {
                 when (event.action) {
@@ -73,20 +63,25 @@ class FloatingUIManager(private val context: Context, private val onToggleListen
                         initialY = layoutParams.y
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
+                        isClick = true
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        layoutParams.x = initialX + (event.rawX - initialTouchX).toInt()
-                        layoutParams.y = initialY + (event.rawY - initialTouchY).toInt()
+                        val dx = (event.rawX - initialTouchX).toInt()
+                        val dy = (event.rawY - initialTouchY).toInt()
+                        if (dx * dx + dy * dy > 25) {
+                            isClick = false
+                        }
+                        layoutParams.x = initialX + dx
+                        layoutParams.y = initialY + dy
                         windowManager?.updateViewLayout(floatingView, layoutParams)
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
-                        // Tính khoảng cách di chuyển để phân biệt Drag và Click
-                        val dx = event.rawX - initialTouchX
-                        val dy = event.rawY - initialTouchY
-                        if (dx * dx + dy * dy < 100) { // Nếu vuốt rất nhỏ -> Coi là Click
-                            button?.performClick()
+                        if (isClick) {
+                            isBotActive = !isBotActive
+                            updateIcon()
+                            onToggleListener(isBotActive)
                         }
                         return true
                     }
@@ -95,18 +90,28 @@ class FloatingUIManager(private val context: Context, private val onToggleListen
             }
         })
 
-        floatingView = layout
+        floatingView = iconView
         windowManager?.addView(floatingView, layoutParams)
     }
 
-    private fun updateButtonState() {
-        if (isBotActive) {
-            button?.text = "⏸ PAUSE"
-            button?.setBackgroundColor(Color.parseColor("#F44336")) // Màu đỏ
-        } else {
-            button?.text = "▶ PLAY"
-            button?.setBackgroundColor(Color.parseColor("#4CAF50")) // Màu xanh
+    private fun updateIcon() {
+        val view = iconView ?: return
+        val bg = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            // Nền đen đậm rõ nét, viền trắng tinh tế
+            setColor(Color.parseColor("#EE1A1A1A"))
+            setStroke(dpToPx(2), Color.WHITE)
         }
+        view.background = bg
+        view.text = if (isBotActive) "⏹" else "▶"
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            context.resources.displayMetrics
+        ).toInt()
     }
 
     fun hide() {
