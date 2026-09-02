@@ -31,7 +31,14 @@ class ScreenCaptureManager(
     // Channel để chứa các frame mới nhất, bỏ qua frame cũ nếu không kịp xử lý
     val frameChannel = Channel<Image>(
         capacity = 2,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        onUndeliveredElement = { image ->
+            try {
+                image.close()
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
     )
 
     fun startCapture() {
@@ -63,16 +70,26 @@ class ScreenCaptureManager(
             screenWidth,
             screenHeight,
             PixelFormat.RGBA_8888,
-            2 // maxImages
+            5 // maxImages
         ).apply {
             setOnImageAvailableListener({ reader ->
-                val image = reader.acquireLatestImage()
-                if (image != null) {
-                    val result = frameChannel.trySend(image)
-                    if (result.isFailure) {
-                        // Nếu channel đầy và đẩy bị lỗi (mặc dù đã dùng DROP_OLDEST), ta đóng image lại để tránh leak
-                        image.close()
+                try {
+                    val image = reader.acquireLatestImage()
+                    if (image != null) {
+                        val result = frameChannel.trySend(image)
+                        if (result.isFailure) {
+                            image.close()
+                        }
                     }
+                } catch (e: IllegalStateException) {
+                    Log.e(TAG, "Too many images acquired", e)
+                    // Thử lấy và đóng ảnh tiếp theo để giải phóng
+                    try {
+                        val staleImage = reader.acquireNextImage()
+                        staleImage?.close()
+                    } catch (ex: Exception) { }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error acquiring image", e)
                 }
             }, null)
         }

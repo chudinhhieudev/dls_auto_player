@@ -9,6 +9,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.dlsautoplayer.capture.ScreenCaptureManager
+import com.dlsautoplayer.vision.VisionEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,6 +24,7 @@ class BotForegroundService : Service() {
 
     private var screenCaptureManager: ScreenCaptureManager? = null
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
+    private val visionEngine = VisionEngine()
 
     override fun onCreate() {
         super.onCreate()
@@ -63,9 +65,20 @@ class BotForegroundService : Service() {
                         lastTime = currentTime
                     }
                     
-                    // TODO: Đẩy hình ảnh vào Vision Engine ở đây
-                    
-                    image.close()
+                    try {
+                        val detections = visionEngine.processFrame(image)
+                        for (det in detections) {
+                            Log.d(TAG, "Vision: Detected ${det.label} at (${det.x}, ${det.y}) conf=${det.confidence}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error processing frame", e)
+                    } finally {
+                        try {
+                            image.close()
+                        } catch (e: Exception) {
+                            // Bỏ qua lỗi đóng
+                        }
+                    }
                 }
             }
         }
