@@ -6,9 +6,23 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.dlsautoplayer.capture.ScreenCaptureManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class BotForegroundService : Service() {
+
+    companion object {
+        private const val TAG = "BotForegroundService"
+    }
+
+    private var screenCaptureManager: ScreenCaptureManager? = null
+    private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
 
     override fun onCreate() {
         super.onCreate()
@@ -19,9 +33,42 @@ class BotForegroundService : Service() {
         val notification = createNotification()
         startForeground(1, notification)
         
-        // TODO: Bắt đầu quá trình Screen Capture (MediaProjection) ở đây
+        val resultCode = intent?.getIntExtra("RESULT_CODE", 0) ?: 0
+        @Suppress("DEPRECATION")
+        val data = intent?.getParcelableExtra<Intent>("DATA")
+
+        if (resultCode != 0 && data != null) {
+            startScreenCapture(resultCode, data)
+        }
         
         return START_NOT_STICKY
+    }
+
+    private fun startScreenCapture(resultCode: Int, data: Intent) {
+        screenCaptureManager = ScreenCaptureManager(this, resultCode, data)
+        screenCaptureManager?.startCapture()
+
+        serviceScope.launch {
+            val channel = screenCaptureManager?.frameChannel
+            if (channel != null) {
+                var frameCount = 0
+                var lastTime = System.currentTimeMillis()
+                
+                for (image in channel) {
+                    frameCount++
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastTime >= 1000) {
+                        Log.d(TAG, "FPS: $frameCount")
+                        frameCount = 0
+                        lastTime = currentTime
+                    }
+                    
+                    // TODO: Đẩy hình ảnh vào Vision Engine ở đây
+                    
+                    image.close()
+                }
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -30,7 +77,8 @@ class BotForegroundService : Service() {
     
     override fun onDestroy() {
         super.onDestroy()
-        // TODO: Dừng Screen Capture
+        screenCaptureManager?.stopCapture()
+        serviceScope.cancel()
     }
 
     private fun createNotificationChannel() {

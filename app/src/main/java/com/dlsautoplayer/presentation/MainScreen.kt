@@ -12,7 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    onStartBot: () -> Unit,
+    onStopBot: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -22,15 +25,11 @@ fun MainScreen() {
     ) {
         Text(text = "DLS Auto Player", modifier = Modifier.padding(bottom = 32.dp))
         
-        Button(onClick = {
-            // TODO: Yêu cầu quyền Screen Capture và start ForegroundService
-        }) {
+        Button(onClick = onStartBot) {
             Text("Start Bot")
         }
 
-        Button(onClick = {
-            // TODO: Stop ForegroundService
-        }, modifier = Modifier.padding(top = 16.dp)) {
+        Button(onClick = onStopBot, modifier = Modifier.padding(top = 16.dp)) {
             Text("Stop Bot")
         }
     }
