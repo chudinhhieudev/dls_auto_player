@@ -15,4 +15,8 @@ interface GameInputController {
      * Vuốt trên màn hình từ điểm bắt đầu đến điểm kết thúc trong một khoảng thời gian
      */
     fun swipe(startX: Float, startY: Float, endX: Float, endY: Float, durationMs: Long)
+    /**
+     * Tự động bấm nút SÚT (Nút A)
+     */
+    fun shoot()
 }

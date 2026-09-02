@@ -25,11 +25,7 @@ class BotAccessibilityService : AccessibilityService() {
         val metrics = DisplayMetrics()
         windowManager.defaultDisplay.getRealMetrics(metrics)
 
-        inputController = AccessibilityInputController(
-            accessibilityService = this,
-            screenWidth = metrics.widthPixels,
-            screenHeight = metrics.heightPixels
-        )
+        inputController = AccessibilityInputController(this)
         Log.d(TAG, "Input Controller initialized: ${metrics.widthPixels}x${metrics.heightPixels}")
     }
 

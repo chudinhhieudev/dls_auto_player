@@ -5,6 +5,9 @@ import android.media.Image
 import android.util.Log
 import com.dlsautoplayer.vision.detector.BallDetector
 import com.dlsautoplayer.vision.detector.PlayerDetector
+import com.dlsautoplayer.vision.detector.ScoreboardDetector
+import com.dlsautoplayer.vision.detector.TeammateDetector
+import com.dlsautoplayer.vision.detector.GoalkeeperDetector
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.Mat
@@ -19,6 +22,9 @@ class VisionEngine {
 
     private val ballDetector = BallDetector()
     private val playerDetector = PlayerDetector()
+    private val scoreboardDetector = ScoreboardDetector()
+    private val teammateDetector = TeammateDetector()
+    private val goalkeeperDetector = GoalkeeperDetector()
 
     init {
         if (!OpenCVLoader.initDebug()) {
@@ -45,6 +51,15 @@ class VisionEngine {
 
         val player = playerDetector.detect(mat)
         if (player != null) results.add(player)
+
+        val scoreboard = scoreboardDetector.detect(mat)
+        if (scoreboard != null) results.add(scoreboard)
+
+        val teammates = teammateDetector.detect(mat)
+        results.addAll(teammates)
+
+        val goalkeeper = goalkeeperDetector.detect(mat)
+        if (goalkeeper != null) results.add(goalkeeper)
 
         mat.release() // Giải phóng bộ nhớ
         return results
